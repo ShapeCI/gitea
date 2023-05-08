@@ -160,10 +160,6 @@ func AllCommitsCount(ctx context.Context, repoPath string, hidePRRefs bool, file
 	return strconv.ParseInt(strings.TrimSpace(stdout), 10, 64)
 }
 
-<<<<<<< HEAD
-// CommitsCountFiles returns number of total commits of until given revision.
-func CommitsCountFiles(ctx context.Context, repoPath, not string, revision, relpath []string) (int64, error) {
-=======
 // CommitsCountOptions the options when counting commits
 type CommitsCountOptions struct {
 	RepoPath string
@@ -174,7 +170,6 @@ type CommitsCountOptions struct {
 
 // CommitsCount returns number of total commits of until given revision.
 func CommitsCount(ctx context.Context, opts CommitsCountOptions) (int64, error) {
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 	cmd := NewCommand(ctx, "rev-list", "--count")
 
 	cmd.AddDynamicArguments(opts.Revision...)
@@ -183,19 +178,11 @@ func CommitsCount(ctx context.Context, opts CommitsCountOptions) (int64, error) 
 		cmd.AddOptionValues("--not", opts.Not)
 	}
 
-<<<<<<< HEAD
-	if not != "" {
-		cmd.AddOptionValues("--not", not)
-	}
-
-	stdout, _, err := cmd.RunStdString(&RunOpts{Dir: repoPath})
-=======
 	if len(opts.RelPath) > 0 {
 		cmd.AddDashesAndList(opts.RelPath...)
 	}
 
 	stdout, _, err := cmd.RunStdString(&RunOpts{Dir: opts.RepoPath})
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 	if err != nil {
 		return 0, err
 	}
@@ -203,23 +190,12 @@ func CommitsCount(ctx context.Context, opts CommitsCountOptions) (int64, error) 
 	return strconv.ParseInt(strings.TrimSpace(stdout), 10, 64)
 }
 
-<<<<<<< HEAD
-// CommitsCount returns number of total commits of until given revision.
-func CommitsCount(ctx context.Context, repoPath, not string, revision ...string) (int64, error) {
-	return CommitsCountFiles(ctx, repoPath, not, revision, []string{})
-}
-
-// CommitsCount returns number of total commits of until current revision.
-func (c *Commit) CommitsCount(not string) (int64, error) {
-	return CommitsCount(c.repo.Ctx, c.repo.Path, not, c.ID.String())
-=======
 // CommitsCount returns number of total commits of until current revision.
 func (c *Commit) CommitsCount() (int64, error) {
 	return CommitsCount(c.repo.Ctx, CommitsCountOptions{
 		RepoPath: c.repo.Path,
 		Revision: []string{c.ID.String()},
 	})
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 }
 
 // CommitsByRange returns the specific page commits before current revision, every page's number default by CommitsRangeSize

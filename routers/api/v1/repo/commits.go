@@ -183,16 +183,12 @@ func GetAllCommits(ctx *context.APIContext) {
 		}
 
 		// Total commit count
-<<<<<<< HEAD
-		commitsCountTotal, err = baseCommit.CommitsCount(not)
-=======
 		commitsCountTotal, err = git.CommitsCount(ctx.Repo.GitRepo.Ctx, git.CommitsCountOptions{
 			RepoPath: ctx.Repo.GitRepo.Path,
 			Not:      not,
 			Revision: []string{baseCommit.ID.String()},
 		})
 
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 		if err != nil {
 			ctx.Error(http.StatusInternalServerError, "GetCommitsCount", err)
 			return
@@ -209,9 +205,6 @@ func GetAllCommits(ctx *context.APIContext) {
 			sha = ctx.Repo.Repository.DefaultBranch
 		}
 
-<<<<<<< HEAD
-		commitsCountTotal, err = ctx.Repo.GitRepo.FileCommitsCount(sha, path, not)
-=======
 		commitsCountTotal, err = git.CommitsCount(ctx,
 			git.CommitsCountOptions{
 				RepoPath: ctx.Repo.GitRepo.Path,
@@ -220,7 +213,6 @@ func GetAllCommits(ctx *context.APIContext) {
 				RelPath:  []string{path},
 			})
 
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 		if err != nil {
 			ctx.Error(http.StatusInternalServerError, "FileCommitsCount", err)
 			return

@@ -207,16 +207,12 @@ func (r *Repository) GetCommitGraphsCount(ctx context.Context, hidePRRefs bool, 
 		if len(branches) == 0 {
 			return git.AllCommitsCount(ctx, r.Repository.RepoPath(), hidePRRefs, files...)
 		}
-<<<<<<< HEAD
-		return git.CommitsCountFiles(ctx, r.Repository.RepoPath(), "", branches, files)
-=======
 		return git.CommitsCount(ctx,
 			git.CommitsCountOptions{
 				RepoPath: r.Repository.RepoPath(),
 				Revision: branches,
 				RelPath:  files,
 			})
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 	})
 }
 

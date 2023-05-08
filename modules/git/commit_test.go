@@ -14,16 +14,12 @@ import (
 func TestCommitsCount(t *testing.T) {
 	bareRepo1Path := filepath.Join(testReposDir, "repo1_bare")
 
-<<<<<<< HEAD
-	commitsCount, err := CommitsCount(DefaultContext, bareRepo1Path, "", "8006ff9adbf0cb94da7dad9e537e53817f9fa5c0")
-=======
 	commitsCount, err := CommitsCount(DefaultContext,
 		CommitsCountOptions{
 			RepoPath: bareRepo1Path,
 			Revision: []string{"8006ff9adbf0cb94da7dad9e537e53817f9fa5c0"},
 		})
 
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 	assert.NoError(t, err)
 	assert.Equal(t, int64(3), commitsCount)
 }

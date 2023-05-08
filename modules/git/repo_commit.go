@@ -204,10 +204,6 @@ func (repo *Repository) FileChangedBetweenCommits(filename, id1, id2 string) (bo
 }
 
 // FileCommitsCount return the number of files at a revision
-<<<<<<< HEAD
-func (repo *Repository) FileCommitsCount(revision, file, not string) (int64, error) {
-	return CommitsCountFiles(repo.Ctx, repo.Path, not, []string{revision}, []string{file})
-=======
 func (repo *Repository) FileCommitsCount(revision, file string) (int64, error) {
 	return CommitsCount(repo.Ctx,
 		CommitsCountOptions{
@@ -222,7 +218,6 @@ type CommitsByFileAndRangeOptions struct {
 	File     string
 	Not      string
 	Page     int
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 }
 
 // CommitsByFileAndRange return the commits according revision file and the page
@@ -387,13 +382,6 @@ func (repo *Repository) CommitsBetweenIDs(last, before string) ([]*Commit, error
 
 // CommitsCountBetween return numbers of commits between two commits
 func (repo *Repository) CommitsCountBetween(start, end string) (int64, error) {
-<<<<<<< HEAD
-	count, err := CommitsCountFiles(repo.Ctx, repo.Path, "", []string{start + ".." + end}, []string{})
-	if err != nil && strings.Contains(err.Error(), "no merge base") {
-		// future versions of git >= 2.28 are likely to return an error if before and last have become unrelated.
-		// previously it would return the results of git rev-list before last so let's try that...
-		return CommitsCountFiles(repo.Ctx, repo.Path, "", []string{start, end}, []string{})
-=======
 	count, err := CommitsCount(repo.Ctx, CommitsCountOptions{
 		RepoPath: repo.Path,
 		Revision: []string{start + ".." + end},
@@ -406,7 +394,6 @@ func (repo *Repository) CommitsCountBetween(start, end string) (int64, error) {
 			RepoPath: repo.Path,
 			Revision: []string{start, end},
 		})
->>>>>>> d33d063f48d143619c66c1fcab0e389547655729
 	}
 
 	return count, err
@@ -522,7 +509,7 @@ func (repo *Repository) AddLastCommitCache(cacheKey, fullName, sha string) error
 			if err != nil {
 				return 0, err
 			}
-			return commit.CommitsCount("")
+			return commit.CommitsCount()
 		})
 		if err != nil {
 			return err
