@@ -196,7 +196,7 @@ type SearchOptions struct {
 	RepoID   int64
 	Page     int
 	IsClosed util.OptionalBool
-	SortType string
+	OrderBy  db.SearchOrderBy
 	Type     Type
 }
 
@@ -226,24 +226,29 @@ func CountProjects(ctx context.Context, opts SearchOptions) (int64, error) {
 	return db.GetEngine(ctx).Where(opts.toConds()).Count(new(Project))
 }
 
+func GetSearchOrderByBySortType(sortType string) db.SearchOrderBy {
+	switch sortType {
+	case "oldest":
+		return db.SearchOrderByOldest
+	case "recentupdate":
+		return db.SearchOrderByRecentUpdated
+	case "leastupdate":
+		return db.SearchOrderByLeastUpdated
+	default:
+		return db.SearchOrderByNewest
+	}
+}
+
 // FindProjects returns a list of all projects that have been created in the repository
 func FindProjects(ctx context.Context, opts SearchOptions) ([]*Project, int64, error) {
 	e := db.GetEngine(ctx).Where(opts.toConds())
+	if opts.OrderBy.String() != "" {
+		e = e.OrderBy(opts.OrderBy.String())
+	}
 	projects := make([]*Project, 0, setting.UI.IssuePagingNum)
 
 	if opts.Page > 0 {
 		e = e.Limit(setting.UI.IssuePagingNum, (opts.Page-1)*setting.UI.IssuePagingNum)
-	}
-
-	switch opts.SortType {
-	case "oldest":
-		e.Desc("created_unix")
-	case "recentupdate":
-		e.Desc("updated_unix")
-	case "leastupdate":
-		e.Asc("updated_unix")
-	default:
-		e.Asc("created_unix")
 	}
 
 	count, err := e.FindAndCount(&projects)
@@ -298,6 +303,18 @@ func GetProjectByID(ctx context.Context, id int64) (*Project, error) {
 		return nil, ErrProjectNotExist{ID: id}
 	}
 
+	return p, nil
+}
+
+// GetProjectForRepoByID returns the projects in a repository
+func GetProjectForRepoByID(ctx context.Context, repoID, id int64) (*Project, error) {
+	p := new(Project)
+	has, err := db.GetEngine(ctx).Where("id=? AND repo_id=?", id, repoID).Get(p)
+	if err != nil {
+		return nil, err
+	} else if !has {
+		return nil, ErrProjectNotExist{ID: id}
+	}
 	return p, nil
 }
 

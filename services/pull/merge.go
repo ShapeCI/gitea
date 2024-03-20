@@ -36,8 +36,8 @@ import (
 	issue_service "code.gitea.io/gitea/services/issue"
 )
 
-// GetDefaultMergeMessage returns default message used when merging pull request
-func GetDefaultMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr *issues_model.PullRequest, mergeStyle repo_model.MergeStyle) (message, body string, err error) {
+// getMergeMessage composes the message used when merging a pull request.
+func getMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr *issues_model.PullRequest, mergeStyle repo_model.MergeStyle, extraVars map[string]string) (message, body string, err error) {
 	if err := pr.LoadBaseRepo(ctx); err != nil {
 		return "", "", err
 	}
@@ -45,6 +45,9 @@ func GetDefaultMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr
 		return "", "", err
 	}
 	if err := pr.LoadIssue(ctx); err != nil {
+		return "", "", err
+	}
+	if err := pr.Issue.LoadPoster(ctx); err != nil {
 		return "", "", err
 	}
 
@@ -83,6 +86,9 @@ func GetDefaultMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr
 				vars["HeadRepoOwnerName"] = pr.HeadRepo.OwnerName
 				vars["HeadRepoName"] = pr.HeadRepo.Name
 			}
+			for extraKey, extraValue := range extraVars {
+				vars[extraKey] = extraValue
+			}
 			refs, err := pr.ResolveCrossReferences(ctx)
 			if err == nil {
 				closeIssueIndexes := make([]string, 0, len(refs))
@@ -107,6 +113,11 @@ func GetDefaultMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr
 			message, body = expandDefaultMergeMessage(templateContent, vars)
 			return message, body, nil
 		}
+	}
+
+	if mergeStyle == repo_model.MergeStyleRebase {
+		// for fast-forward rebase, do not amend the last commit if there is no template
+		return "", "", nil
 	}
 
 	// Squash merge has a different from other styles.
@@ -135,6 +146,12 @@ func expandDefaultMergeMessage(template string, vars map[string]string) (message
 	return os.Expand(message, mapping), os.Expand(body, mapping)
 }
 
+// GetDefaultMergeMessage returns default message used when merging pull request
+func GetDefaultMergeMessage(ctx context.Context, baseGitRepo *git.Repository, pr *issues_model.PullRequest, mergeStyle repo_model.MergeStyle) (message, body string, err error) {
+	return getMergeMessage(ctx, baseGitRepo, pr, mergeStyle, nil)
+}
+
+// Caller should check PR is ready to be merged (review and status checks)
 func IsStrategyValid(strategy string) bool {
 	return strategy == "theirs" ||
 		strategy == "ours" ||

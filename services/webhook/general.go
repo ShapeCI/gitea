@@ -131,6 +131,10 @@ func getPullRequestPayloadInfo(p *api.PullRequestPayload, linkFormatter linkForm
 	case api.HookIssueReviewed:
 		text = fmt.Sprintf("[%s] Pull request reviewed: %s", repoLink, titleLink)
 		attachmentText = p.Review.Content
+	case api.HookIssueReviewRequested:
+		text = fmt.Sprintf("[%s] Pull request review requested: %s", repoLink, titleLink)
+	case api.HookIssueReviewRequestRemoved:
+		text = fmt.Sprintf("[%s] Pull request review request removed: %s", repoLink, titleLink)
 	}
 	if withSender {
 		text += fmt.Sprintf(" by %s", linkFormatter(setting.AppURL+p.Sender.UserName, p.Sender.UserName))
@@ -226,6 +230,24 @@ func getIssueCommentPayloadInfo(p *api.IssueCommentPayload, linkFormatter linkFo
 	return text, issueTitle, color
 }
 
+func getPackagePayloadInfo(p *api.PackagePayload, linkFormatter linkFormatter, withSender bool) (text string, color int) {
+	refLink := linkFormatter(p.Package.HTMLURL, p.Package.Name+":"+p.Package.Version)
+
+	switch p.Action {
+	case api.HookPackageCreated:
+		text = fmt.Sprintf("Package created: %s", refLink)
+		color = greenColor
+	case api.HookPackageDeleted:
+		text = fmt.Sprintf("Package deleted: %s", refLink)
+		color = redColor
+	}
+	if withSender {
+		text += fmt.Sprintf(" by %s", linkFormatter(setting.AppURL+url.PathEscape(p.Sender.UserName), p.Sender.UserName))
+	}
+
+	return text, color
+}
+
 // ToHook convert models.Webhook to api.Hook
 // This function is not part of the convert package to prevent an import cycle
 func ToHook(repoLink string, w *webhook_model.Webhook) (*api.Hook, error) {
@@ -256,5 +278,6 @@ func ToHook(repoLink string, w *webhook_model.Webhook) (*api.Hook, error) {
 		AuthorizationHeader: authorizationHeader,
 		Updated:             w.UpdatedUnix.AsTime(),
 		Created:             w.CreatedUnix.AsTime(),
+		BranchFilter:        w.BranchFilter,
 	}, nil
 }

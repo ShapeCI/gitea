@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"code.gitea.io/gitea/models/unittest"
 	"code.gitea.io/gitea/modules/emoji"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
@@ -28,9 +29,7 @@ var localMetas = map[string]string{
 }
 
 func TestMain(m *testing.M) {
-	setting.Init(&setting.Options{
-		AllowEmpty: true,
-	})
+	unittest.InitSettings()
 	if err := git.InitSimple(context.Background()); err != nil {
 		log.Fatal("git init failed, err: %v", err)
 	}
@@ -264,6 +263,18 @@ func TestRender_email(t *testing.T) {
 	test(
 		"send email to info@gitea.co.uk.",
 		`<p>send email to <a href="mailto:info@gitea.co.uk" rel="nofollow">info@gitea.co.uk</a>.</p>`)
+
+	test(
+		`j.doe@example.com,
+	j.doe@example.com.
+	j.doe@example.com;
+	j.doe@example.com?
+	j.doe@example.com!`,
+		`<p><a href="mailto:j.doe@example.com" rel="nofollow">j.doe@example.com</a>,<br/>
+<a href="mailto:j.doe@example.com" rel="nofollow">j.doe@example.com</a>.<br/>
+<a href="mailto:j.doe@example.com" rel="nofollow">j.doe@example.com</a>;<br/>
+<a href="mailto:j.doe@example.com" rel="nofollow">j.doe@example.com</a>?<br/>
+<a href="mailto:j.doe@example.com" rel="nofollow">j.doe@example.com</a>!</p>`)
 
 	// Test that should *not* be turned into email links
 	test(

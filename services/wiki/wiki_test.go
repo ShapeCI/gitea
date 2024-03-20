@@ -59,6 +59,7 @@ func TestWebPathToDisplayName(t *testing.T) {
 		{"name with / slash", "name-with %2F slash"},
 		{"name with % percent", "name-with %25 percent"},
 		{"2000-01-02 meeting", "2000-01-02+meeting.-.md"},
+		{"a b", "a%20b.md"},
 	} {
 		_, displayName := WebPathToUserTitle(test.WebPath)
 		assert.EqualValues(t, test.Expected, displayName)
@@ -73,7 +74,8 @@ func TestWebPathToGitPath(t *testing.T) {
 	for _, test := range []test{
 		{"wiki-name.md", "wiki%20name"},
 		{"wiki-name.md", "wiki+name"},
-		{"wiki%20name.md", "wiki%20name.md"},
+		{"wiki name.md", "wiki%20name.md"},
+		{"wiki%20name.md", "wiki%2520name.md"},
 		{"2000-01-02-meeting.md", "2000-01-02+meeting"},
 		{"2000-01-02 meeting.-.md", "2000-01-02%20meeting.-"},
 	} {
@@ -247,8 +249,8 @@ func TestPrepareWikiFileName(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	repo := unittest.AssertExistsAndLoadBean(t, &repo_model.Repository{ID: 1})
 	gitRepo, err := git.OpenRepository(git.DefaultContext, repo.WikiPath())
-	defer gitRepo.Close()
 	assert.NoError(t, err)
+	defer gitRepo.Close()
 
 	tests := []struct {
 		name      string
@@ -299,8 +301,8 @@ func TestPrepareWikiFileName_FirstPage(t *testing.T) {
 	assert.NoError(t, err)
 
 	gitRepo, err := git.OpenRepository(git.DefaultContext, tmpDir)
-	defer gitRepo.Close()
 	assert.NoError(t, err)
+	defer gitRepo.Close()
 
 	existence, newWikiPath, err := prepareGitPath(gitRepo, "Home")
 	assert.False(t, existence)

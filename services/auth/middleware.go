@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"code.gitea.io/gitea/models/auth"
+	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/setting"
@@ -17,11 +17,15 @@ import (
 // Auth is a middleware to authenticate a web user
 func Auth(authMethod Method) func(*context.Context) {
 	return func(ctx *context.Context) {
-		if err := authShared(ctx, authMethod); err != nil {
+		ar, err := authShared(ctx.Base, ctx.Session, authMethod)
+		if err != nil {
 			log.Error("Failed to verify user: %v", err)
 			ctx.Error(http.StatusUnauthorized, "Verify")
 			return
 		}
+		ctx.Doer = ar.Doer
+		ctx.IsSigned = ar.Doer != nil
+		ctx.IsBasicAuth = ar.IsBasicAuth
 		if ctx.Doer == nil {
 			// ensure the session uid is deleted
 			_ = ctx.Session.Delete("uid")
@@ -32,32 +36,41 @@ func Auth(authMethod Method) func(*context.Context) {
 // APIAuth is a middleware to authenticate an api user
 func APIAuth(authMethod Method) func(*context.APIContext) {
 	return func(ctx *context.APIContext) {
-		if err := authShared(ctx.Context, authMethod); err != nil {
+		ar, err := authShared(ctx.Base, nil, authMethod)
+		if err != nil {
 			ctx.Error(http.StatusUnauthorized, "APIAuth", err)
+			return
 		}
+		ctx.Doer = ar.Doer
+		ctx.IsSigned = ar.Doer != nil
+		ctx.IsBasicAuth = ar.IsBasicAuth
 	}
 }
 
-func authShared(ctx *context.Context, authMethod Method) error {
-	var err error
-	ctx.Doer, err = authMethod.Verify(ctx.Req, ctx.Resp, ctx, ctx.Session)
+type authResult struct {
+	Doer        *user_model.User
+	IsBasicAuth bool
+}
+
+func authShared(ctx *context.Base, sessionStore SessionStore, authMethod Method) (ar authResult, err error) {
+	ar.Doer, err = authMethod.Verify(ctx.Req, ctx.Resp, ctx, sessionStore)
 	if err != nil {
-		return err
+		return ar, err
 	}
-	if ctx.Doer != nil {
-		if ctx.Locale.Language() != ctx.Doer.Language {
+	if ar.Doer != nil {
+		if ctx.Locale.Language() != ar.Doer.Language {
 			ctx.Locale = middleware.Locale(ctx.Resp, ctx.Req)
 		}
-		ctx.IsBasicAuth = ctx.Data["AuthedMethod"].(string) == BasicMethodName
-		ctx.IsSigned = true
-		ctx.Data["IsSigned"] = ctx.IsSigned
-		ctx.Data[middleware.ContextDataKeySignedUser] = ctx.Doer
-		ctx.Data["SignedUserID"] = ctx.Doer.ID
-		ctx.Data["IsAdmin"] = ctx.Doer.IsAdmin
+		ar.IsBasicAuth = ctx.Data["AuthedMethod"].(string) == BasicMethodName
+
+		ctx.Data["IsSigned"] = true
+		ctx.Data[middleware.ContextDataKeySignedUser] = ar.Doer
+		ctx.Data["SignedUserID"] = ar.Doer.ID
+		ctx.Data["IsAdmin"] = ar.Doer.IsAdmin
 	} else {
 		ctx.Data["SignedUserID"] = int64(0)
 	}
-	return nil
+	return ar, nil
 }
 
 // VerifyOptions contains required or check options
@@ -68,7 +81,7 @@ type VerifyOptions struct {
 	DisableCSRF     bool
 }
 
-// Checks authentication according to options
+// VerifyAuthWithOptions checks authentication according to options
 func VerifyAuthWithOptions(options *VerifyOptions) func(ctx *context.Context) {
 	return func(ctx *context.Context) {
 		// Check prohibit login users.
@@ -153,7 +166,7 @@ func VerifyAuthWithOptions(options *VerifyOptions) func(ctx *context.Context) {
 	}
 }
 
-// Checks authentication according to options
+// VerifyAuthWithOptionsAPI checks authentication according to options
 func VerifyAuthWithOptionsAPI(options *VerifyOptions) func(ctx *context.APIContext) {
 	return func(ctx *context.APIContext) {
 		// Check prohibit login users.
@@ -197,33 +210,10 @@ func VerifyAuthWithOptionsAPI(options *VerifyOptions) func(ctx *context.APIConte
 				return
 			} else if !ctx.Doer.IsActive && setting.Service.RegisterEmailConfirm {
 				ctx.Data["Title"] = ctx.Tr("auth.active_your_account")
-				ctx.HTML(http.StatusOK, "user/auth/activate")
+				ctx.JSON(http.StatusForbidden, map[string]string{
+					"message": "This account is not activated.",
+				})
 				return
-			}
-			if ctx.IsSigned && ctx.IsBasicAuth {
-				if skip, ok := ctx.Data["SkipLocalTwoFA"]; ok && skip.(bool) {
-					return // Skip 2FA
-				}
-				twofa, err := auth.GetTwoFactorByUID(ctx.Doer.ID)
-				if err != nil {
-					if auth.IsErrTwoFactorNotEnrolled(err) {
-						return // No 2FA enrollment for this user
-					}
-					ctx.InternalServerError(err)
-					return
-				}
-				otpHeader := ctx.Req.Header.Get("X-Gitea-OTP")
-				ok, err := twofa.ValidateTOTP(otpHeader)
-				if err != nil {
-					ctx.InternalServerError(err)
-					return
-				}
-				if !ok {
-					ctx.JSON(http.StatusForbidden, map[string]string{
-						"message": "Only signed in user is allowed to call APIs.",
-					})
-					return
-				}
 			}
 		}
 

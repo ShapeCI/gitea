@@ -54,7 +54,7 @@ func TestCreateReadOnlyDeployKey(t *testing.T) {
 	repoOwner := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: repo.OwnerID})
 
 	session := loginUser(t, repoOwner.Name)
-	token := getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeRepo)
+	token := getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeWriteRepository)
 	keysURL := fmt.Sprintf("/api/v1/repos/%s/%s/keys?token=%s", repoOwner.Name, repo.Name, token)
 	rawKeyBody := api.CreateKeyOption{
 		Title:    "read-only",
@@ -72,6 +72,17 @@ func TestCreateReadOnlyDeployKey(t *testing.T) {
 		Content: rawKeyBody.Key,
 		Mode:    perm.AccessModeRead,
 	})
+
+	// Using the ID of a key that does not belong to the repository must fail
+	{
+		req := NewRequest(t, "GET", fmt.Sprintf("/api/v1/repos/%s/%s/keys/%d?token=%s", repoOwner.Name, repo.Name, newDeployKey.ID, token))
+		MakeRequest(t, req, http.StatusOK)
+
+		session5 := loginUser(t, "user5")
+		token5 := getTokenForLoggedInUser(t, session5, auth_model.AccessTokenScopeWriteRepository)
+		req = NewRequest(t, "GET", fmt.Sprintf("/api/v1/repos/user5/repo4/keys/%d?token=%s", newDeployKey.ID, token5))
+		MakeRequest(t, req, http.StatusNotFound)
+	}
 }
 
 func TestCreateReadWriteDeployKey(t *testing.T) {
@@ -80,7 +91,7 @@ func TestCreateReadWriteDeployKey(t *testing.T) {
 	repoOwner := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: repo.OwnerID})
 
 	session := loginUser(t, repoOwner.Name)
-	token := getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeRepo)
+	token := getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeWriteRepository)
 	keysURL := fmt.Sprintf("/api/v1/repos/%s/%s/keys?token=%s", repoOwner.Name, repo.Name, token)
 	rawKeyBody := api.CreateKeyOption{
 		Title: "read-write",
@@ -104,7 +115,7 @@ func TestCreateUserKey(t *testing.T) {
 	user := unittest.AssertExistsAndLoadBean(t, &user_model.User{Name: "user1"})
 
 	session := loginUser(t, "user1")
-	token := url.QueryEscape(getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeAdminPublicKey))
+	token := url.QueryEscape(getTokenForLoggedInUser(t, session, auth_model.AccessTokenScopeWriteUser))
 	keysURL := fmt.Sprintf("/api/v1/user/keys?token=%s", token)
 	keyType := "ssh-rsa"
 	keyContent := "AAAAB3NzaC1yc2EAAAADAQABAAABgQC4cn+iXnA4KvcQYSV88vGn0Yi91vG47t1P7okprVmhNTkipNRIHWr6WdCO4VDr/cvsRkuVJAsLO2enwjGWWueOO6BodiBgyAOZ/5t5nJNMCNuLGT5UIo/RI1b0WRQwxEZTRjt6mFNw6lH14wRd8ulsr9toSWBPMOGWoYs1PDeDL0JuTjL+tr1SZi/EyxCngpYszKdXllJEHyI79KQgeD0Vt3pTrkbNVTOEcCNqZePSVmUH8X8Vhugz3bnE0/iE9Pb5fkWO9c4AnM1FgI/8Bvp27Fw2ShryIXuR6kKvUqhVMTuOSDHwu6A8jLE5Owt3GAYugDpDYuwTVNGrHLXKpPzrGGPE/jPmaLCMZcsdkec95dYeU3zKODEm8UQZFhmJmDeWVJ36nGrGZHL4J5aTTaeFUJmmXDaJYiJ+K2/ioKgXqnXvltu0A9R8/LGy4nrTJRr4JMLuJFoUXvGm1gXQ70w2LSpk6yl71RNC0hCtsBe8BP8IhYCM0EP5jh7eCMQZNvM="
@@ -168,7 +179,7 @@ func TestCreateUserKey(t *testing.T) {
 
 	// Now login as user 2
 	session2 := loginUser(t, "user2")
-	token2 := url.QueryEscape(getTokenForLoggedInUser(t, session2, auth_model.AccessTokenScopeAdminPublicKey))
+	token2 := url.QueryEscape(getTokenForLoggedInUser(t, session2, auth_model.AccessTokenScopeWriteUser))
 
 	// Should find key even though not ours, but we shouldn't know whose it is
 	fingerprintURL = fmt.Sprintf("/api/v1/user/keys?token=%s&fingerprint=%s", token2, newPublicKey.Fingerprint)

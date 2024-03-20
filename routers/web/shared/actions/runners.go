@@ -53,7 +53,7 @@ func RunnersList(ctx *context.Context, opts actions_model.FindRunnerOptions) {
 	ctx.Data["Runners"] = runners
 	ctx.Data["Total"] = count
 	ctx.Data["RegistrationToken"] = token.Token
-	ctx.Data["RunnerOnwerID"] = opts.OwnerID
+	ctx.Data["RunnerOwnerID"] = opts.OwnerID
 	ctx.Data["RunnerRepoID"] = opts.RepoID
 
 	pager := context.NewPagination(int(count), opts.PageSize, opts.Page, 5)
@@ -162,7 +162,7 @@ func RunnerDeletePost(ctx *context.Context, runnerID int64,
 		log.Warn("DeleteRunnerPost.UpdateRunner failed: %v, url: %s", err, ctx.Req.URL)
 		ctx.Flash.Warning(ctx.Tr("actions.runners.delete_runner_failed"))
 
-		ctx.JSON(http.StatusOK, map[string]interface{}{
+		ctx.JSON(http.StatusOK, map[string]any{
 			"redirect": failedRedirectTo,
 		})
 		return
@@ -172,7 +172,7 @@ func RunnerDeletePost(ctx *context.Context, runnerID int64,
 
 	ctx.Flash.Success(ctx.Tr("actions.runners.delete_runner_success"))
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"redirect": successRedirectTo,
 	})
 }

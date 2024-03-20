@@ -49,13 +49,12 @@ func GetRelease(ctx *context.APIContext) {
 	//     "$ref": "#/responses/notFound"
 
 	id := ctx.ParamsInt64(":id")
-	release, err := repo_model.GetReleaseByID(ctx, id)
+	release, err := repo_model.GetReleaseForRepoByID(ctx, ctx.Repo.Repository.ID, id)
 	if err != nil && !repo_model.IsErrReleaseNotExist(err) {
-		ctx.Error(http.StatusInternalServerError, "GetReleaseByID", err)
+		ctx.Error(http.StatusInternalServerError, "GetReleaseForRepoByID", err)
 		return
 	}
-	if err != nil && repo_model.IsErrReleaseNotExist(err) ||
-		release.IsTag || release.RepoID != ctx.Repo.Repository.ID {
+	if err != nil && repo_model.IsErrReleaseNotExist(err) || release.IsTag {
 		ctx.NotFound()
 		return
 	}
@@ -64,7 +63,7 @@ func GetRelease(ctx *context.APIContext) {
 		ctx.Error(http.StatusInternalServerError, "LoadAttributes", err)
 		return
 	}
-	ctx.JSON(http.StatusOK, convert.ToRelease(ctx, release))
+	ctx.JSON(http.StatusOK, convert.ToAPIRelease(ctx, ctx.Repo.Repository, release))
 }
 
 // GetLatestRelease gets the most recent non-prerelease, non-draft release of a repository, sorted by created_at
@@ -105,7 +104,7 @@ func GetLatestRelease(ctx *context.APIContext) {
 		ctx.Error(http.StatusInternalServerError, "LoadAttributes", err)
 		return
 	}
-	ctx.JSON(http.StatusOK, convert.ToRelease(ctx, release))
+	ctx.JSON(http.StatusOK, convert.ToAPIRelease(ctx, ctx.Repo.Repository, release))
 }
 
 // ListReleases list a repository's releases
@@ -174,7 +173,7 @@ func ListReleases(ctx *context.APIContext) {
 			ctx.Error(http.StatusInternalServerError, "LoadAttributes", err)
 			return
 		}
-		rels[i] = convert.ToRelease(ctx, release)
+		rels[i] = convert.ToAPIRelease(ctx, ctx.Repo.Repository, release)
 	}
 
 	filteredCount, err := repo_model.CountReleasesByRepoID(ctx.Repo.Repository.ID, opts)
@@ -272,7 +271,7 @@ func CreateRelease(ctx *context.APIContext) {
 			return
 		}
 	}
-	ctx.JSON(http.StatusCreated, convert.ToRelease(ctx, rel))
+	ctx.JSON(http.StatusCreated, convert.ToAPIRelease(ctx, ctx.Repo.Repository, rel))
 }
 
 // EditRelease edit a release
@@ -313,13 +312,12 @@ func EditRelease(ctx *context.APIContext) {
 
 	form := web.GetForm(ctx).(*api.EditReleaseOption)
 	id := ctx.ParamsInt64(":id")
-	rel, err := repo_model.GetReleaseByID(ctx, id)
+	rel, err := repo_model.GetReleaseForRepoByID(ctx, ctx.Repo.Repository.ID, id)
 	if err != nil && !repo_model.IsErrReleaseNotExist(err) {
-		ctx.Error(http.StatusInternalServerError, "GetReleaseByID", err)
+		ctx.Error(http.StatusInternalServerError, "GetReleaseForRepoByID", err)
 		return
 	}
-	if err != nil && repo_model.IsErrReleaseNotExist(err) ||
-		rel.IsTag || rel.RepoID != ctx.Repo.Repository.ID {
+	if err != nil && repo_model.IsErrReleaseNotExist(err) || rel.IsTag {
 		ctx.NotFound()
 		return
 	}
@@ -357,7 +355,7 @@ func EditRelease(ctx *context.APIContext) {
 		ctx.Error(http.StatusInternalServerError, "LoadAttributes", err)
 		return
 	}
-	ctx.JSON(http.StatusOK, convert.ToRelease(ctx, rel))
+	ctx.JSON(http.StatusOK, convert.ToAPIRelease(ctx, ctx.Repo.Repository, rel))
 }
 
 // DeleteRelease delete a release from a repository
@@ -391,17 +389,16 @@ func DeleteRelease(ctx *context.APIContext) {
 	//     "$ref": "#/responses/empty"
 
 	id := ctx.ParamsInt64(":id")
-	rel, err := repo_model.GetReleaseByID(ctx, id)
+	rel, err := repo_model.GetReleaseForRepoByID(ctx, ctx.Repo.Repository.ID, id)
 	if err != nil && !repo_model.IsErrReleaseNotExist(err) {
-		ctx.Error(http.StatusInternalServerError, "GetReleaseByID", err)
+		ctx.Error(http.StatusInternalServerError, "GetReleaseForRepoByID", err)
 		return
 	}
-	if err != nil && repo_model.IsErrReleaseNotExist(err) ||
-		rel.IsTag || rel.RepoID != ctx.Repo.Repository.ID {
+	if err != nil && repo_model.IsErrReleaseNotExist(err) || rel.IsTag {
 		ctx.NotFound()
 		return
 	}
-	if err := release_service.DeleteReleaseByID(ctx, id, ctx.Doer, false); err != nil {
+	if err := release_service.DeleteReleaseByID(ctx, ctx.Repo.Repository, rel, ctx.Doer, false); err != nil {
 		if models.IsErrProtectedTagName(err) {
 			ctx.Error(http.StatusMethodNotAllowed, "delTag", "user not allowed to delete protected tag")
 			return

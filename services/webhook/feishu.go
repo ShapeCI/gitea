@@ -16,7 +16,7 @@ import (
 type (
 	// FeishuPayload represents
 	FeishuPayload struct {
-		MsgType string `json:"msg_type"` // text / post / image / share_chat / interactive
+		MsgType string `json:"msg_type"` // text / post / image / share_chat / interactive / file /audio / media
 		Content struct {
 			Text string `json:"text"`
 		} `json:"content"`
@@ -48,7 +48,7 @@ var _ PayloadConvertor = &FeishuPayload{}
 // Create implements PayloadConvertor Create method
 func (f *FeishuPayload) Create(p *api.CreatePayload) (api.Payloader, error) {
 	// created tag/branch
-	refName := git.RefEndName(p.Ref)
+	refName := git.RefName(p.Ref).ShortName()
 	text := fmt.Sprintf("[%s] %s %s created", p.Repo.FullName, p.RefType, refName)
 
 	return newFeishuTextPayload(text), nil
@@ -57,7 +57,7 @@ func (f *FeishuPayload) Create(p *api.CreatePayload) (api.Payloader, error) {
 // Delete implements PayloadConvertor Delete method
 func (f *FeishuPayload) Delete(p *api.DeletePayload) (api.Payloader, error) {
 	// created tag/branch
-	refName := git.RefEndName(p.Ref)
+	refName := git.RefName(p.Ref).ShortName()
 	text := fmt.Sprintf("[%s] %s %s deleted", p.Repo.FullName, p.RefType, refName)
 
 	return newFeishuTextPayload(text), nil
@@ -73,7 +73,7 @@ func (f *FeishuPayload) Fork(p *api.ForkPayload) (api.Payloader, error) {
 // Push implements PayloadConvertor Push method
 func (f *FeishuPayload) Push(p *api.PushPayload) (api.Payloader, error) {
 	var (
-		branchName = git.RefEndName(p.Ref)
+		branchName = git.RefName(p.Ref).ShortName()
 		commitDesc string
 	)
 
@@ -154,6 +154,12 @@ func (f *FeishuPayload) Wiki(p *api.WikiPayload) (api.Payloader, error) {
 // Release implements PayloadConvertor Release method
 func (f *FeishuPayload) Release(p *api.ReleasePayload) (api.Payloader, error) {
 	text, _ := getReleasePayloadInfo(p, noneLinkFormatter, true)
+
+	return newFeishuTextPayload(text), nil
+}
+
+func (f *FeishuPayload) Package(p *api.PackagePayload) (api.Payloader, error) {
+	text, _ := getPackagePayloadInfo(p, noneLinkFormatter, true)
 
 	return newFeishuTextPayload(text), nil
 }

@@ -97,7 +97,7 @@ func Dashboard(ctx *context.Context) {
 		uid = ctxUser.ID
 	}
 
-	ctx.PageData["dashboardRepoList"] = map[string]interface{}{
+	ctx.PageData["dashboardRepoList"] = map[string]any{
 		"searchLimit": setting.UI.User.RepoPagingNum,
 		"uid":         uid,
 	}
@@ -156,7 +156,7 @@ func Milestones(ctx *context.Context) {
 	}
 
 	repoOpts := repo_model.SearchRepoOptions{
-		Actor:         ctxUser,
+		Actor:         ctx.Doer,
 		OwnerID:       ctxUser.ID,
 		Private:       true,
 		AllPublic:     false, // Include also all public repositories of users and public organisations
@@ -437,7 +437,7 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 	// - Team has read permission to repository.
 	repoOpts := &repo_model.SearchRepoOptions{
 		Actor:      ctx.Doer,
-		OwnerID:    ctx.Doer.ID,
+		OwnerID:    ctxUser.ID,
 		Private:    true,
 		AllPublic:  false,
 		AllLimited: false,
@@ -695,7 +695,7 @@ func getRepoIDs(reposQuery string) []int64 {
 		return []int64{}
 	}
 	if !issueReposQueryPattern.MatchString(reposQuery) {
-		log.Warn("issueReposQueryPattern does not match query")
+		log.Warn("issueReposQueryPattern does not match query: %q", reposQuery)
 		return []int64{}
 	}
 
@@ -821,6 +821,11 @@ func UsernameSubRoute(ctx *context.Context) {
 	reloadParam := func(suffix string) (success bool) {
 		ctx.SetParams("username", strings.TrimSuffix(username, suffix))
 		context_service.UserAssignmentWeb()(ctx)
+		// check view permissions
+		if !user_model.IsUserVisibleToViewer(ctx, ctx.ContextUser, ctx.Doer) {
+			ctx.NotFound("user", fmt.Errorf(ctx.ContextUser.Name))
+			return false
+		}
 		return !ctx.Written()
 	}
 	switch {

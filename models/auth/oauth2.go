@@ -51,16 +51,17 @@ func (app *OAuth2Application) TableName() string {
 	return "oauth2_application"
 }
 
-// PrimaryRedirectURI returns the first redirect uri or an empty string if empty
-func (app *OAuth2Application) PrimaryRedirectURI() string {
-	if len(app.RedirectURIs) == 0 {
-		return ""
-	}
-	return app.RedirectURIs[0]
-}
-
 // ContainsRedirectURI checks if redirectURI is allowed for app
 func (app *OAuth2Application) ContainsRedirectURI(redirectURI string) bool {
+	contains := func(s string) bool {
+		s = strings.TrimSuffix(strings.ToLower(s), "/")
+		for _, u := range app.RedirectURIs {
+			if strings.TrimSuffix(strings.ToLower(u), "/") == s {
+				return true
+			}
+		}
+		return false
+	}
 	if !app.ConfidentialClient {
 		uri, err := url.Parse(redirectURI)
 		// ignore port for http loopback uris following https://datatracker.ietf.org/doc/html/rfc8252#section-7.3
@@ -69,13 +70,13 @@ func (app *OAuth2Application) ContainsRedirectURI(redirectURI string) bool {
 			if ip != nil && ip.IsLoopback() {
 				// strip port
 				uri.Host = uri.Hostname()
-				if util.SliceContainsString(app.RedirectURIs, uri.String(), true) {
+				if contains(uri.String()) {
 					return true
 				}
 			}
 		}
 	}
-	return util.SliceContainsString(app.RedirectURIs, redirectURI, true)
+	return contains(redirectURI)
 }
 
 // Base32 characters, but lowercased.

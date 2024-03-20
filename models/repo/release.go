@@ -201,6 +201,21 @@ func GetReleaseByID(ctx context.Context, id int64) (*Release, error) {
 	return rel, nil
 }
 
+// GetReleaseForRepoByID returns release with given ID.
+func GetReleaseForRepoByID(ctx context.Context, repoID, id int64) (*Release, error) {
+	rel := new(Release)
+	has, err := db.GetEngine(ctx).
+		Where("id=? AND repo_id=?", id, repoID).
+		Get(rel)
+	if err != nil {
+		return nil, err
+	} else if !has {
+		return nil, ErrReleaseNotExist{id, ""}
+	}
+
+	return rel, nil
+}
+
 // FindReleasesOptions describes the conditions to Find releases
 type FindReleasesOptions struct {
 	db.ListOptions
@@ -442,7 +457,7 @@ func UpdateReleasesMigrationsByType(gitServiceType structs.GitServiceType, origi
 	_, err := db.GetEngine(db.DefaultContext).Table("release").
 		Where("repo_id IN (SELECT id FROM repository WHERE original_service_type = ?)", gitServiceType).
 		And("original_author_id = ?", originalAuthorID).
-		Update(map[string]interface{}{
+		Update(map[string]any{
 			"publisher_id":       posterID,
 			"original_author":    "",
 			"original_author_id": 0,

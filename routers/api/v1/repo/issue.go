@@ -116,7 +116,7 @@ func SearchIssues(ctx *context.APIContext) {
 	//   "200":
 	//     "$ref": "#/responses/IssueList"
 
-	before, since, err := context.GetQueryBeforeSince(ctx.Context)
+	before, since, err := context.GetQueryBeforeSince(ctx.Base)
 	if err != nil {
 		ctx.Error(http.StatusUnprocessableEntity, "GetQueryBeforeSince", err)
 		return
@@ -368,7 +368,7 @@ func ListIssues(ctx *context.APIContext) {
 	// responses:
 	//   "200":
 	//     "$ref": "#/responses/IssueList"
-	before, since, err := context.GetQueryBeforeSince(ctx.Context)
+	before, since, err := context.GetQueryBeforeSince(ctx.Base)
 	if err != nil {
 		ctx.Error(http.StatusUnprocessableEntity, "GetQueryBeforeSince", err)
 		return
@@ -449,6 +449,24 @@ func ListIssues(ctx *context.APIContext) {
 		isPull = util.OptionalBoolFalse
 	default:
 		isPull = util.OptionalBoolNone
+	}
+
+	if isPull != util.OptionalBoolNone && !ctx.Repo.CanReadIssuesOrPulls(isPull.IsTrue()) {
+		ctx.NotFound()
+		return
+	}
+
+	if isPull == util.OptionalBoolNone {
+		canReadIssues := ctx.Repo.CanRead(unit.TypeIssues)
+		canReadPulls := ctx.Repo.CanRead(unit.TypePullRequests)
+		if !canReadIssues && !canReadPulls {
+			ctx.NotFound()
+			return
+		} else if !canReadIssues {
+			isPull = util.OptionalBoolTrue
+		} else if !canReadPulls {
+			isPull = util.OptionalBoolFalse
+		}
 	}
 
 	// FIXME: we should be more efficient here
@@ -559,6 +577,10 @@ func GetIssue(ctx *context.APIContext) {
 		} else {
 			ctx.Error(http.StatusInternalServerError, "GetIssueByIndex", err)
 		}
+		return
+	}
+	if !ctx.Repo.CanReadIssuesOrPulls(issue.IsPull) {
+		ctx.NotFound()
 		return
 	}
 	ctx.JSON(http.StatusOK, convert.ToAPIIssue(ctx, issue))

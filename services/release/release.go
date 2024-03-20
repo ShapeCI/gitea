@@ -80,14 +80,15 @@ func createTag(ctx context.Context, gitRepo *git.Repository, rel *repo_model.Rel
 			commits.HeadCommit = repository.CommitToPushCommit(commit)
 			commits.CompareURL = rel.Repo.ComposeCompareURL(git.EmptySHA, commit.ID.String())
 
+			refFullName := git.RefNameFromTag(rel.TagName)
 			notification.NotifyPushCommits(
 				ctx, rel.Publisher, rel.Repo,
 				&repository.PushUpdateOptions{
-					RefFullName: git.TagPrefix + rel.TagName,
+					RefFullName: refFullName,
 					OldCommitID: git.EmptySHA,
 					NewCommitID: commit.ID.String(),
 				}, commits)
-			notification.NotifyCreateRef(ctx, rel.Publisher, rel.Repo, "tag", git.TagPrefix+rel.TagName, commit.ID.String())
+			notification.NotifyCreateRef(ctx, rel.Publisher, rel.Repo, refFullName, commit.ID.String())
 			rel.CreatedUnix = timeutil.TimeStampNow()
 		}
 		commit, err := gitRepo.GetTagCommit(rel.TagName)
@@ -290,17 +291,7 @@ func UpdateRelease(doer *user_model.User, gitRepo *git.Repository, rel *repo_mod
 }
 
 // DeleteReleaseByID deletes a release and corresponding Git tag by given ID.
-func DeleteReleaseByID(ctx context.Context, id int64, doer *user_model.User, delTag bool) error {
-	rel, err := repo_model.GetReleaseByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("GetReleaseByID: %w", err)
-	}
-
-	repo, err := repo_model.GetRepositoryByID(ctx, rel.RepoID)
-	if err != nil {
-		return fmt.Errorf("GetRepositoryByID: %w", err)
-	}
-
+func DeleteReleaseByID(ctx context.Context, repo *repo_model.Repository, rel *repo_model.Release, doer *user_model.User, delTag bool) error {
 	if delTag {
 		protectedTags, err := git_model.GetProtectedTags(ctx, rel.RepoID)
 		if err != nil {
@@ -323,28 +314,29 @@ func DeleteReleaseByID(ctx context.Context, id int64, doer *user_model.User, del
 			return fmt.Errorf("git tag -d: %w", err)
 		}
 
+		refName := git.RefNameFromTag(rel.TagName)
 		notification.NotifyPushCommits(
 			ctx, doer, repo,
 			&repository.PushUpdateOptions{
-				RefFullName: git.TagPrefix + rel.TagName,
+				RefFullName: refName,
 				OldCommitID: rel.Sha1,
 				NewCommitID: git.EmptySHA,
 			}, repository.NewPushCommits())
-		notification.NotifyDeleteRef(ctx, doer, repo, "tag", git.TagPrefix+rel.TagName)
+		notification.NotifyDeleteRef(ctx, doer, repo, refName)
 
-		if err := repo_model.DeleteReleaseByID(ctx, id); err != nil {
+		if err := repo_model.DeleteReleaseByID(ctx, rel.ID); err != nil {
 			return fmt.Errorf("DeleteReleaseByID: %w", err)
 		}
 	} else {
 		rel.IsTag = true
 
-		if err = repo_model.UpdateRelease(ctx, rel); err != nil {
+		if err := repo_model.UpdateRelease(ctx, rel); err != nil {
 			return fmt.Errorf("Update: %w", err)
 		}
 	}
 
 	rel.Repo = repo
-	if err = rel.LoadAttributes(ctx); err != nil {
+	if err := rel.LoadAttributes(ctx); err != nil {
 		return fmt.Errorf("LoadAttributes: %w", err)
 	}
 

@@ -123,7 +123,7 @@ func (m *mailNotifier) NotifyIssueChangeAssignee(ctx context.Context, doer *user
 	}
 }
 
-func (m *mailNotifier) NotifyPullReviewRequest(ctx context.Context, doer *user_model.User, issue *issues_model.Issue, reviewer *user_model.User, isRequest bool, comment *issues_model.Comment) {
+func (m *mailNotifier) NotifyPullRequestReviewRequest(ctx context.Context, doer *user_model.User, issue *issues_model.Issue, reviewer *user_model.User, isRequest bool, comment *issues_model.Comment) {
 	if isRequest && doer.ID != reviewer.ID && reviewer.EmailNotifications() != user_model.EmailNotificationsDisabled {
 		ct := fmt.Sprintf("Requested to review %s.", issue.HTMLURL())
 		if err := mailer.SendIssueAssignedMail(ctx, issue, doer, ct, comment, []*user_model.User{reviewer}); err != nil {
@@ -177,6 +177,9 @@ func (m *mailNotifier) NotifyPullRequestPushCommits(ctx context.Context, doer *u
 }
 
 func (m *mailNotifier) NotifyPullReviewDismiss(ctx context.Context, doer *user_model.User, review *issues_model.Review, comment *issues_model.Comment) {
+	if err := comment.Review.LoadReviewer(ctx); err != nil {
+		log.Error("Error in PullReviewDismiss while loading reviewer for issue[%d], review[%d] and reviewer[%d]: %v", review.Issue.ID, comment.Review.ID, comment.Review.ReviewerID, err)
+	}
 	if err := mailer.MailParticipantsComment(ctx, comment, activities_model.ActionPullReviewDismissed, review.Issue, nil); err != nil {
 		log.Error("MailParticipantsComment: %v", err)
 	}

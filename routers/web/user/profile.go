@@ -107,7 +107,7 @@ func Profile(ctx *context.Context) {
 		}
 		blob, err := commit.GetBlobByPath("README.md")
 		if err == nil {
-			bytes, err := blob.GetBlobContent()
+			bytes, err := blob.GetBlobContent(setting.UI.MaxDisplayFileSize)
 			if err != nil {
 				ctx.ServerError("GetBlobContent", err)
 				return
@@ -115,6 +115,7 @@ func Profile(ctx *context.Context) {
 			profileContent, err := markdown.RenderString(&markup.RenderContext{
 				Ctx:     ctx,
 				GitRepo: gitRepo,
+				Metas:   map[string]string{"mode": "document"},
 			}, bytes)
 			if err != nil {
 				ctx.ServerError("RenderString", err)
@@ -222,10 +223,10 @@ func Profile(ctx *context.Context) {
 	switch tab {
 	case "followers":
 		ctx.Data["Cards"] = followers
-		total = int(count)
+		total = int(numFollowers)
 	case "following":
 		ctx.Data["Cards"] = following
-		total = int(count)
+		total = int(numFollowing)
 	case "activity":
 		date := ctx.FormString("date")
 		items, count, err := activities_model.GetFeeds(ctx, activities_model.GetFeedsOptions{

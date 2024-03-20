@@ -251,7 +251,6 @@ func ParseCompareInfo(ctx *context.Context) *CompareInfo {
 		isSameRepo = true
 		ci.HeadUser = ctx.Repo.Owner
 		ci.HeadBranch = headInfos[0]
-
 	} else if len(headInfos) == 2 {
 		headInfosSplit := strings.Split(headInfos[0], "/")
 		if len(headInfosSplit) == 1 {
@@ -406,6 +405,9 @@ func ParseCompareInfo(ctx *context.Context) *CompareInfo {
 			return nil
 		}
 		defer ci.HeadGitRepo.Close()
+	} else {
+		ctx.NotFound("ParseCompareInfo", nil)
+		return nil
 	}
 
 	ctx.Data["HeadRepo"] = ci.HeadRepo
@@ -459,7 +461,7 @@ func ParseCompareInfo(ctx *context.Context) *CompareInfo {
 		rootRepo.ID != ci.HeadRepo.ID &&
 		rootRepo.ID != baseRepo.ID {
 		canRead := access_model.CheckRepoUnitUser(ctx, rootRepo, ctx.Doer, unit.TypeCode)
-		if canRead && rootRepo.AllowsPulls() {
+		if canRead {
 			ctx.Data["RootRepo"] = rootRepo
 			if !fileOnly {
 				branches, tags, err := getBranchesAndTagsForRepo(ctx, rootRepo)
@@ -785,7 +787,7 @@ func CompareDiff(ctx *context.Context) {
 
 	ctx.Data["IsRepoToolbarCommits"] = true
 	ctx.Data["IsDiffCompare"] = true
-	templateErrs := setTemplateIfExists(ctx, pullRequestTemplateKey, pullRequestTemplateCandidates)
+	_, templateErrs := setTemplateIfExists(ctx, pullRequestTemplateKey, pullRequestTemplateCandidates)
 
 	if len(templateErrs) > 0 {
 		ctx.Flash.Warning(renderErrorOfTemplates(ctx, templateErrs), true)

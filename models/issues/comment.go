@@ -107,6 +107,8 @@ const (
 	CommentTypePRScheduledToAutoMerge   // 34 pr was scheduled to auto merge when checks succeed
 	CommentTypePRUnScheduledToAutoMerge // 35 pr was un scheduled to auto merge when checks succeed
 
+	CommentTypePin   // 36 pin Issue
+	CommentTypeUnpin // 37 unpin Issue
 )
 
 var commentStrings = []string{
@@ -146,6 +148,8 @@ var commentStrings = []string{
 	"change_issue_ref",
 	"pull_scheduled_merge",
 	"pull_cancel_scheduled_merge",
+	"pin",
+	"unpin",
 }
 
 func (t CommentType) String() string {
@@ -163,7 +167,7 @@ func AsCommentType(typeName string) CommentType {
 
 func (t CommentType) HasContentSupport() bool {
 	switch t {
-	case CommentTypeComment, CommentTypeCode, CommentTypeReview:
+	case CommentTypeComment, CommentTypeCode, CommentTypeReview, CommentTypeDismissReview:
 		return true
 	}
 	return false
@@ -1010,6 +1014,7 @@ type FindCommentsOptions struct {
 	Type        CommentType
 	IssueIDs    []int64
 	Invalidated util.OptionalBool
+	IsPull      util.OptionalBool
 }
 
 // ToConds implements FindOptions interface
@@ -1044,14 +1049,17 @@ func (opts *FindCommentsOptions) ToConds() builder.Cond {
 	if !opts.Invalidated.IsNone() {
 		cond = cond.And(builder.Eq{"comment.invalidated": opts.Invalidated.IsTrue()})
 	}
+	if opts.IsPull != util.OptionalBoolNone {
+		cond = cond.And(builder.Eq{"issue.is_pull": opts.IsPull.IsTrue()})
+	}
 	return cond
 }
 
 // FindComments returns all comments according options
-func FindComments(ctx context.Context, opts *FindCommentsOptions) ([]*Comment, error) {
+func FindComments(ctx context.Context, opts *FindCommentsOptions) (CommentList, error) {
 	comments := make([]*Comment, 0, 10)
 	sess := db.GetEngine(ctx).Where(opts.ToConds())
-	if opts.RepoID > 0 {
+	if opts.RepoID > 0 || opts.IsPull != util.OptionalBoolNone {
 		sess.Join("INNER", "issue", "issue.id = comment.issue_id")
 	}
 
@@ -1127,7 +1135,7 @@ func DeleteComment(ctx context.Context, comment *Comment) error {
 	}
 	if _, err := e.Table("action").
 		Where("comment_id = ?", comment.ID).
-		Update(map[string]interface{}{
+		Update(map[string]any{
 			"is_deleted": true,
 		}); err != nil {
 		return err
@@ -1152,7 +1160,7 @@ func UpdateCommentsMigrationsByType(tp structs.GitServiceType, originalAuthorID 
 				}),
 		)).
 		And("comment.original_author_id = ?", originalAuthorID).
-		Update(map[string]interface{}{
+		Update(map[string]any{
 			"poster_id":          posterID,
 			"original_author":    "",
 			"original_author_id": 0,
